@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <!-- السماح بـ open-meteo للطقس -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">api.open-meteo.com</domain>
+        <domain includeSubdomains="true">ipapi.co</domain>
+        <domain includeSubdomains="true">suggestqueries.google.com</domain>
+        <domain includeSubdomains="true">search.brave.com</domain>
+    </domain-config>
+</network-security-config>
