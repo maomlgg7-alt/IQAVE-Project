@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>Samurai Space — New Tab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Kufi+Arabic:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #c9a84c;
+            --accent-light: #f0d080;
+            --accent-rgb: 201,168,76;
+            --border: rgba(201,168,76,0.25);
+            --border-hover: rgba(201,168,76,0.55);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body, html { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Noto Kufi Arabic',sans-serif; color:#fff; cursor:none; }
+
+        /* Cursor */
+        .cursor { position:fixed; width:6px; height:6px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; mix-blend-mode:screen; transition:transform .1s; }
+        .cursor-ring { position:fixed; width:28px; height:28px; border:1px solid rgba(var(--accent-rgb),.5); border-radius:50%; pointer-events:none; z-index:9998; transition:width .2s,height .2s; }
+
+        /* Background */
+        #bgMedia { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; filter:brightness(0.45) saturate(0.8); }
+        .bg-overlay { position:fixed; inset:0; z-index:1; background:radial-gradient(ellipse 60% 80% at 50% 100%,rgba(139,26,26,.15) 0%,transparent 70%),radial-gradient(ellipse 80% 40% at 50% 0%,rgba(0,0,0,.6) 0%,transparent 70%),linear-gradient(180deg,rgba(0,0,0,.4) 0%,transparent 40%,rgba(0,0,0,.5) 100%); }
+        .scanlines { position:fixed; inset:0; z-index:2; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px); pointer-events:none; }
+
+        /* Corners */
+        .corner { position:fixed; width:80px; height:80px; z-index:10; opacity:.45; }
+        .corner svg { width:100%; height:100%; }
+        .corner-tl{top:20px;left:20px} .corner-tr{top:20px;right:20px;transform:scaleX(-1)} .corner-bl{bottom:20px;left:20px;transform:scaleY(-1)} .corner-br{bottom:20px;right:20px;transform:scale(-1)}
+        .kanji-deco { position:fixed; font-size:220px; color:rgba(var(--accent-rgb),.04); font-family:serif; pointer-events:none; z-index:3; user-select:none; top:50%; left:50%; transform:translate(-50%,-50%); }
+
+        /* Layout */
+        .container { position:relative; z-index:10; width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; padding:20px; }
+
+        /* Clock */
+        .clock-wrap { text-align:center; animation:fadeInDown .8s ease both; }
+        .clock { font-family:'Cinzel',serif; font-size:clamp(60px,10vw,108px); font-weight:700; letter-spacing:8px; color:#fff; text-shadow:0 0 40px rgba(var(--accent-rgb),.4),0 0 80px rgba(var(--accent-rgb),.15); line-height:1; }
+        .clock .colon { color:var(--accent); animation:blink 1s step-end infinite; }
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+        .date-line { margin-top:10px; font-size:13px; letter-spacing:4px; color:rgba(var(--accent-rgb),.7); font-weight:300; }
+        .greeting { font-size:13px; letter-spacing:3px; color:rgba(255,255,255,.4); text-transform:uppercase; animation:fadeIn 1s ease .6s both; }
+        .divider { width:200px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.6; animation:fadeIn 1s ease .3s both; }
+
+        /* Search */
+        .search-wrap { position:relative; width:min(600px,90vw); animation:fadeInUp .8s ease .2s both; }
+        .search-icon { position:absolute; right:18px; top:50%; transform:translateY(-50%); color:var(--accent); opacity:.7; font-size:16px; pointer-events:none; }
+        .search-bar { width:100%; padding:14px 50px 14px 20px; background:rgba(0,0,0,.55); border:1px solid var(--border); border-radius:4px; color:#fff; font-family:'Noto Kufi Arabic',sans-serif; font-size:15px; outline:none; backdrop-filter:blur(20px); transition:border-color .3s,box-shadow .3s,background .3s; text-align:right; }
+        .search-bar::placeholder { color:rgba(255,255,255,.3); font-size:14px; }
+        .search-bar:focus { border-color:var(--border-hover); box-shadow:0 0 0 1px rgba(var(--accent-rgb),.2),0 4px 30px rgba(0,0,0,.4); background:rgba(0,0,0,.7); }
+
+        /* Suggestions — تطلع لفوق */
+        .suggestions { position:absolute; bottom:calc(100% + 6px); top:auto; right:0; left:0; background:rgba(8,8,14,.95); border:1px solid var(--border); border-radius:4px; backdrop-filter:blur(20px); z-index:200; overflow:hidden; display:none; max-height:280px; overflow-y:auto; }
+        .suggestions.open { display:block; }
+        .suggestion-item { padding:11px 18px; font-size:14px; color:rgba(255,255,255,.8); cursor:none; display:flex; align-items:center; gap:10px; transition:background .15s; }
+        .suggestion-item:hover,.suggestion-item.active { background:rgba(var(--accent-rgb),.1); color:var(--accent-light); }
+        .sug-icon { color:var(--accent); opacity:.6; font-size:12px; }
+
+        /* ── Categories System ── */
+        .cats-wrap { animation:fadeInUp .8s ease .4s both; width:min(780px,95vw); }
+
+        /* Tab bar — draggable */
+        .cat-tabs {
+            display:flex; gap:8px; margin-bottom:14px;
+            overflow-x:auto; overflow-y:hidden;
+            scroll-behavior:smooth;
+            -webkit-overflow-scrolling:touch;
+            scrollbar-width:none;
+            cursor:grab;
+            padding:4px 2px;
+            user-select:none;
+            width:100%;
+            justify-content:flex-start;
+        }
+        .cat-tabs::-webkit-scrollbar { display:none; }
+        .cat-tabs.dragging { cursor:grabbing; scroll-behavior:auto; }
+        .cat-tab { padding:7px 18px; background:rgba(0,0,0,.45); border:1px solid var(--border); border-radius:20px; color:rgba(255,255,255,.5); font-size:11px; letter-spacing:2px; cursor:none; font-family:'Noto Kufi Arabic',sans-serif; transition:background .2s,border-color .2s,color .2s; white-space:nowrap; flex-shrink:0; }
+        .cat-tab:hover { color:rgba(255,255,255,.8); border-color:rgba(var(--accent-rgb),.4); }
+        .cat-tab.active { background:rgba(var(--accent-rgb),.15); border-color:var(--accent); color:var(--accent-light); }
+        .cats-wrap { position:relative; }
+        /* fade edges to hint scroll */
+        .cats-wrap::before,.cats-wrap::after { content:''; position:absolute; top:0; width:28px; height:36px; z-index:2; pointer-events:none; }
+        .cats-wrap::before { left:0; background:linear-gradient(90deg,rgba(0,0,0,.5),transparent); }
+        .cats-wrap::after  { right:0; background:linear-gradient(-90deg,rgba(0,0,0,.5),transparent); }
+
+        /* Links grid */
+        .links-grid { display:none; gap:10px; flex-wrap:wrap; justify-content:center; }
+        .links-grid.active { display:flex; animation:catFadeIn .3s ease both; }
+        @keyframes catFadeIn {
+            from { opacity:0; transform:translateY(8px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .quick-link { display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 16px; background:rgba(0,0,0,.5); border:1px solid var(--border); border-radius:4px; text-decoration:none; color:rgba(255,255,255,.75); font-size:11px; letter-spacing:1px; backdrop-filter:blur(16px); transition:all .22s; min-width:82px; cursor:none; }
+        .quick-link:hover { background:rgba(var(--accent-rgb),.1); border-color:var(--border-hover); color:var(--accent-light); transform:translateY(-3px); box-shadow:0 8px 25px rgba(0,0,0,.4); }
+        .quick-link .icon { font-size:20px; }
+
+        
+        
+        
+
+        
+        
+        
+        
+        
+        
+        
+
+        /* Music btn */
+        .music-btn { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); z-index:20; background:rgba(0,0,0,.6); border:1px solid var(--border); color:var(--accent); padding:8px 20px; border-radius:30px; font-size:12px; letter-spacing:2px; cursor:none; font-family:'Noto Kufi Arabic',sans-serif; backdrop-filter:blur(10px); transition:all .3s; display:flex; align-items:center; gap:8px; opacity:.7; animation:fadeIn 1s ease .8s both; }
+        .music-btn:hover { opacity:1; border-color:var(--accent); }
+        .music-btn .dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.5s ease infinite; }
+        .music-btn.muted .dot { animation:none; opacity:.3; }
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4);opacity:.6}}
+
+        /* Settings btn */
+        .settings-btn { position:fixed; top:24px; left:50%; transform:translateX(-50%); z-index:20; background:rgba(0,0,0,.5); border:1px solid var(--border); color:rgba(255,255,255,.5); width:38px; height:38px; border-radius:50%; font-size:16px; cursor:none; backdrop-filter:blur(10px); transition:all .3s; display:flex; align-items:center; justify-content:center; }
+        .settings-btn:hover { color:var(--accent); border-color:var(--border-hover); transform:translateX(-50%) rotate(60deg); }
+
+        /* Hide btn */
+        .hide-btn { position:fixed; top:24px; left:calc(50% + 50px); z-index:20; background:rgba(0,0,0,.5); border:1px solid var(--border); color:rgba(255,255,255,.5); width:38px; height:38px; border-radius:50%; font-size:15px; cursor:none; backdrop-filter:blur(10px); transition:all .3s; display:flex; align-items:center; justify-content:center; }
+        .hide-btn:hover { color:var(--accent); border-color:var(--border-hover); }
+
+        /* Hidden UI state */
+        body.ui-hidden .container, body.ui-hidden .music-btn, body.ui-hidden .settings-btn, body.ui-hidden .corner, body.ui-hidden .kanji-deco, body.ui-hidden .scanlines { opacity:0; pointer-events:none; }
+        body.ui-hidden .hide-btn { border-color:var(--border-hover); color:var(--accent); }
+        .container, .music-btn, .settings-btn, .corner, .kanji-deco, .scanlines { transition:opacity .4s; }
+
+        /* Settings overlay */
+        .settings-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:none; opacity:0; transition:opacity .3s; align-items:center; justify-content:center; }
+        .settings-overlay.open { display:flex; }
+        .settings-overlay.visible { opacity:1; }
+        .settings-panel { background:rgba(8,8,14,.96); border:1px solid var(--border); border-radius:8px; padding:32px; width:min(480px,93vw); max-height:87vh; overflow-y:auto; position:relative; animation:slideUp .3s ease; }
+        @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .settings-panel::-webkit-scrollbar{width:3px} .settings-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+        .settings-close { position:absolute; top:20px; left:20px; background:none; border:none; color:rgba(255,255,255,.4); font-size:20px; cursor:none; transition:color .2s; line-height:1; padding:4px; }
+        .settings-close:hover { color:#fff; }
+        .settings-title { font-family:'Cinzel',serif; font-size:17px; color:var(--accent); letter-spacing:3px; margin-bottom:28px; display:flex; align-items:center; gap:12px; }
+        .settings-title::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }
+
+        .setting-group { margin-bottom:24px; }
+        .setting-label { font-size:11px; letter-spacing:2px; color:rgba(var(--accent-rgb),.7); margin-bottom:10px; display:block; text-transform:uppercase; }
+
+        /* File drop */
+        .file-drop { border:1px dashed var(--border); border-radius:6px; padding:18px; text-align:center; cursor:none; transition:all .25s; position:relative; overflow:hidden; }
+        .file-drop:hover { border-color:var(--border-hover); background:rgba(var(--accent-rgb),.05); }
+        .file-drop input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+        .drop-icon { font-size:26px; margin-bottom:6px; }
+        .drop-text { font-size:13px; color:rgba(255,255,255,.35); }
+        .drop-name { font-size:12px; color:var(--accent); margin-top:6px; display:none; }
+
+        /* Colors */
+        .color-presets { display:flex; gap:10px; flex-wrap:wrap; }
+        .color-preset { width:32px; height:32px; border-radius:50%; border:2px solid transparent; cursor:none; transition:transform .2s,border-color .2s; }
+        .color-preset:hover { transform:scale(1.18); }
+        .color-preset.active { border-color:#fff; box-shadow:0 0 0 1px rgba(255,255,255,.3); }
+        .color-picker-wrap { display:flex; align-items:center; gap:10px; margin-top:12px; }
+        .color-picker-label { font-size:12px; color:rgba(255,255,255,.35); }
+        input[type=color] { -webkit-appearance:none; width:32px; height:32px; border:1px solid var(--border); border-radius:50%; background:none; cursor:pointer; padding:2px; }
+        input[type=color]::-webkit-color-swatch-wrapper{padding:0;border-radius:50%} input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
+
+        /* Slider */
+        .slider-wrap { display:flex; align-items:center; gap:12px; }
+        input[type=range] { flex:1; -webkit-appearance:none; height:3px; background:var(--border); border-radius:2px; outline:none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; }
+        .slider-val { font-size:12px; color:var(--accent); min-width:34px; text-align:left; }
+        .dim-label { font-size:11px; color:rgba(255,255,255,.25); }
+
+        /* Save */
+        .save-btn { width:100%; padding:13px; background:rgba(var(--accent-rgb),.1); border:1px solid var(--border-hover); border-radius:4px; color:var(--accent); font-family:'Noto Kufi Arabic',sans-serif; font-size:14px; letter-spacing:2px; cursor:none; transition:all .25s; margin-top:6px; }
+        .save-btn:hover { background:rgba(var(--accent-rgb),.2); }
+
+
+
+        /* Notes tabs */
+        .notes-tabs { display:flex; gap:4px; margin-bottom:8px; overflow-x:auto; scrollbar-width:none; }
+        .notes-tabs::-webkit-scrollbar { display:none; }
+        .note-tab { padding:4px 10px; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:12px; font-size:10px; color:rgba(255,255,255,.5); cursor:none; white-space:nowrap; flex-shrink:0; transition:all .15s; }
+        .note-tab.active { background:rgba(var(--accent-rgb),.15); border-color:var(--accent); color:var(--accent-light); }
+        /* Toast notification */
+        .toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(10px); background:rgba(8,8,14,.92); border:1px solid var(--border); color:var(--accent); padding:10px 22px; border-radius:30px; font-size:13px; letter-spacing:1px; backdrop-filter:blur(16px); z-index:9000; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none; white-space:nowrap; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+        /* Shortcuts hint */
+        .shortcuts-hint { position:fixed; bottom:28px; right:28px; z-index:20; font-size:11px; color:rgba(255,255,255,.2); letter-spacing:1px; line-height:1.8; text-align:right; pointer-events:none; animation:fadeIn 1s ease 1.5s both; }
+        .shortcuts-hint span { color:rgba(var(--accent-rgb),.4); }
+
+        /* ── Day/Night blur overlay ── */
+        #dayNightOverlay { position:fixed; inset:0; z-index:1; pointer-events:none; transition:background 2s ease; }
+
+
+        /* ── Layout Mode Switcher ── */
+        .layout-modes { display:flex; gap:6px; justify-content:center; margin-bottom:10px; }
+        .lm-btn { background:rgba(0,0,0,.4); border:1px solid var(--border); color:rgba(255,255,255,.4); width:28px; height:28px; border-radius:50%; font-size:13px; cursor:none; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+        .lm-btn:hover { border-color:var(--border-hover); color:rgba(255,255,255,.8); }
+        .lm-btn.active { background:rgba(var(--accent-rgb),.15); border-color:var(--accent); color:var(--accent-light); }
+
+        /* ── Carousel ── */
+        .cat-carousel { display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:14px; }
+        .car-arrow { background:rgba(0,0,0,.4); border:1px solid var(--border); color:rgba(255,255,255,.5); width:32px; height:32px; border-radius:50%; font-size:20px; cursor:none; transition:all .2s; flex-shrink:0; display:flex; align-items:center; justify-content:center; line-height:1; }
+        .car-arrow:hover { border-color:var(--border-hover); color:var(--accent); }
+        .car-track { display:flex; gap:10px; align-items:center; overflow:hidden; max-width:min(700px,85vw); }
+        .car-item { flex-shrink:0; padding:8px 16px; border-radius:20px; border:1px solid var(--border); background:rgba(0,0,0,.4); color:rgba(255,255,255,.4); font-size:11px; letter-spacing:1px; cursor:none; transition:all .3s; white-space:nowrap; backdrop-filter:blur(10px); }
+        .car-item.center { padding:10px 24px; background:rgba(var(--accent-rgb),.15); border-color:var(--accent); color:var(--accent-light); font-size:13px; transform:scale(1.08); box-shadow:0 0 20px rgba(var(--accent-rgb),.2); }
+        .car-item.side { opacity:.6; transform:scale(0.92); }
+        .car-item.far { opacity:.3; transform:scale(0.82); }
+
+        /* ── Layout Modes ── */
+        /* mode: tabs — default tabs style (already defined) */
+        /* mode: grid */
+        .cats-wrap.mode-grid .cat-carousel { display:none; }
+        .cats-wrap.mode-grid .cat-tabs { display:flex!important; flex-wrap:wrap; justify-content:center; }
+        /* mode: minimal */
+        .cats-wrap.mode-minimal .cat-carousel { display:none; }
+        .cats-wrap.mode-minimal .cat-tabs { display:flex!important; justify-content:center; }
+        .cats-wrap.mode-minimal .cat-tab { border:none; background:transparent; padding:4px 10px; font-size:10px; opacity:.5; }
+        .cats-wrap.mode-minimal .cat-tab.active { opacity:1; border-bottom:1px solid var(--accent); border-radius:0; background:transparent; }
+        /* mode: fan */
+        .cats-wrap.mode-fan .cat-carousel { display:none; }
+        .cats-wrap.mode-fan .cat-tabs { display:flex!important; justify-content:center; gap:4px; }
+        .cats-wrap.mode-fan .cat-tab { border-radius:4px 4px 0 0; border-bottom:none; }
+        .cats-wrap.mode-fan .cat-tab.active { border-color:var(--accent); border-bottom:2px solid var(--accent); }
+        /* ── Draggable Widgets ── */
+        .draggable { position:fixed; z-index:20; user-select:none; }
+        .drag-handle { cursor:grab; display:flex; align-items:center; gap:6px; }
+        .drag-handle:active { cursor:grabbing; }
+        .drag-grip { font-size:10px; opacity:.3; pointer-events:none; }
+        body.ui-hidden .draggable { opacity:0; pointer-events:none; transition:opacity .4s; }
+        .draggable { transition:opacity .4s; }
+
+        /* ── Widgets Bar (top-right) ── */
+        .widgets-bar { top:20px; right:20px; display:flex; flex-direction:column; gap:8px; }
+
+        /* Weather widget */
+        .weather-widget { background:rgba(0,0,0,.55); border:1px solid var(--border); border-radius:8px; padding:10px 14px; backdrop-filter:blur(16px); font-size:12px; color:rgba(255,255,255,.7); display:flex; align-items:center; gap:8px; cursor:none; min-width:120px; }
+        .weather-widget .w-temp { font-family:'Cinzel',serif; font-size:18px; color:#fff; }
+        .weather-widget .w-icon { font-size:22px; }
+
+        /* Recent sites */
+        .recent-sites { background:rgba(0,0,0,.5); border:1px solid var(--border); border-radius:8px; padding:8px; backdrop-filter:blur(16px); display:flex; flex-direction:column; gap:4px; min-width:140px; }
+        .recent-title { font-size:10px; letter-spacing:2px; color:rgba(var(--accent-rgb),.6); padding:0 4px 4px; border-bottom:1px solid var(--border); }
+        .recent-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; text-decoration:none; color:rgba(255,255,255,.6); font-size:11px; transition:all .15s; cursor:none; overflow:hidden; white-space:nowrap; }
+        .recent-item:hover { background:rgba(var(--accent-rgb),.1); color:var(--accent-light); }
+        .recent-item img { width:14px; height:14px; border-radius:2px; flex-shrink:0; }
+        .recent-item span { overflow:hidden; text-overflow:ellipsis; }
+
+        /* ── Notes + Pomodoro (bottom-right) ── */
+        .bottom-widgets { position:fixed; bottom:70px; right:20px; z-index:20; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+        body.ui-hidden .bottom-widgets { opacity:0; pointer-events:none; }
+
+        /* Pomodoro */
+        .pomodoro { background:rgba(0,0,0,.58); border:1px solid var(--border); border-radius:8px; padding:10px 14px; backdrop-filter:blur(16px); display:flex; align-items:center; gap:10px; }
+        .pomo-time { font-family:'Cinzel',serif; font-size:20px; color:#fff; min-width:54px; }
+        .pomo-time.work { color:var(--accent); }
+        .pomo-time.rest { color:#5ce0b0; }
+        .pomo-btn { background:none; border:1px solid var(--border); border-radius:4px; color:rgba(255,255,255,.5); width:26px; height:26px; cursor:none; font-size:13px; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+        .pomo-btn:hover { border-color:var(--border-hover); color:var(--accent); }
+        .pomo-label { font-size:10px; letter-spacing:1px; color:rgba(255,255,255,.3); }
+
+        /* Notes */
+        .notes-wrap { position:relative; }
+        .notes-toggle { background:rgba(0,0,0,.55); border:1px solid var(--border); border-radius:8px; padding:8px 14px; backdrop-filter:blur(16px); font-size:12px; color:rgba(255,255,255,.5); cursor:none; display:flex; align-items:center; gap:6px; transition:all .2s; }
+        .notes-toggle:hover { border-color:var(--border-hover); color:var(--accent); }
+        .notes-panel { position:absolute; bottom:calc(100% + 8px); right:0; width:260px; background:rgba(8,8,14,.95); border:1px solid var(--border); border-radius:8px; padding:12px; backdrop-filter:blur(20px); display:none; animation:slideUp .2s ease; }
+        .notes-panel.open { display:block; }
+        .notes-textarea { width:100%; height:140px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:4px; color:#fff; font-family:'Noto Kufi Arabic',sans-serif; font-size:13px; padding:10px; resize:none; outline:none; line-height:1.6; }
+        .notes-textarea:focus { border-color:var(--border-hover); }
+        .notes-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+        .notes-count { font-size:10px; color:rgba(255,255,255,.25); }
+        .notes-clear { font-size:10px; color:rgba(255,255,255,.25); background:none; border:none; cursor:none; transition:color .2s; }
+        .notes-clear:hover { color:#e05c5c; }
+
+        /* blur slider in settings */
+        .toggle-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .toggle-label { font-size:12px; color:rgba(255,255,255,.5); }
+        .toggle-switch { position:relative; width:36px; height:20px; }
+        .toggle-switch input { opacity:0; width:0; height:0; }
+        .toggle-slider { position:absolute; inset:0; background:rgba(255,255,255,.1); border-radius:20px; cursor:pointer; transition:.3s; border:1px solid var(--border); }
+        .toggle-slider:before { content:''; position:absolute; width:14px; height:14px; left:2px; top:2px; background:rgba(255,255,255,.4); border-radius:50%; transition:.3s; }
+        .toggle-switch input:checked + .toggle-slider { background:rgba(var(--accent-rgb),.3); border-color:var(--accent); }
+        .toggle-switch input:checked + .toggle-slider:before { transform:translateX(16px); background:var(--accent); }
+
+        /* ── Custom Cursors ── */
+        .cursor-none { display:none !important; }
+        /* cursor styles are applied via JS to body */
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<img id="bgMedia" src="samurai.gif" alt="" style="display:block">
+<video id="bgVideo" autoplay loop playsinline muted
+  style="display:none;position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:brightness(0.45) saturate(0.8)"></video>
+<div class="bg-overlay"></div>
+<div id="dayNightOverlay"></div>
+<div class="scanlines"></div>
+<div class="kanji-deco">武士</div>
+
+<div class="corner corner-tl"><svg viewBox="0 0 80 80" fill="none"><path d="M5 75L5 5L75 5" stroke="var(--accent)" stroke-width="1.5"/><path d="M5 40L20 40M40 5L40 20" stroke="var(--accent)" stroke-width="1" opacity=".5"/><circle cx="5" cy="5" r="3" fill="var(--accent)" opacity=".8"/></svg></div>
+<div class="corner corner-tr"><svg viewBox="0 0 80 80" fill="none"><path d="M5 75L5 5L75 5" stroke="var(--accent)" stroke-width="1.5"/><path d="M5 40L20 40M40 5L40 20" stroke="var(--accent)" stroke-width="1" opacity=".5"/><circle cx="5" cy="5" r="3" fill="var(--accent)" opacity=".8"/></svg></div>
+<div class="corner corner-bl"><svg viewBox="0 0 80 80" fill="none"><path d="M5 75L5 5L75 5" stroke="var(--accent)" stroke-width="1.5"/><path d="M5 40L20 40M40 5L40 20" stroke="var(--accent)" stroke-width="1" opacity=".5"/><circle cx="5" cy="5" r="3" fill="var(--accent)" opacity=".8"/></svg></div>
+<div class="corner corner-br"><svg viewBox="0 0 80 80" fill="none"><path d="M5 75L5 5L75 5" stroke="var(--accent)" stroke-width="1.5"/><path d="M5 40L20 40M40 5L40 20" stroke="var(--accent)" stroke-width="1" opacity=".5"/><circle cx="5" cy="5" r="3" fill="var(--accent)" opacity=".8"/></svg></div>
+
+<button class="settings-btn" id="settingsBtn">⚙</button>
+<button class="hide-btn" id="hideBtn">👁</button>
+
+<div class="container">
+    <div class="clock-wrap">
+        <div class="clock">
+            <span id="hours">00</span><span class="colon">:</span><span id="minutes">00</span><span class="colon">:</span><span id="seconds">00</span>
+        </div>
+        <div class="date-line" id="dateDisplay"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="greeting" id="greetingText">أهلاً وسهلاً</div>
+
+    <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-bar" type="text" id="searchInput" placeholder="ابحث في الإنترنت..." autocomplete="off">
+        <div class="suggestions" id="suggestions"></div>
+    </div>
+
+    <div class="cats-wrap" id="catsWrap">
+        <!-- Layout mode switcher -->
+        <div class="layout-modes" id="layoutModes">
+            <button class="lm-btn active" data-mode="carousel" title="كاروسيل">◉</button>
+            <button class="lm-btn" data-mode="tabs" title="تبويبات">☰</button>
+            <button class="lm-btn" data-mode="grid" title="شبكة">⊞</button>
+            <button class="lm-btn" data-mode="minimal" title="بسيط">—</button>
+            <button class="lm-btn" data-mode="fan" title="مروحة">❋</button>
+        </div>
+        <!-- Carousel nav -->
+        <div class="cat-carousel" id="catCarousel">
+            <button class="car-arrow" id="carPrev">‹</button>
+            <div class="car-track" id="carTrack"></div>
+            <button class="car-arrow" id="carNext">›</button>
+        </div>
+        <!-- Tabs fallback -->
+        <div class="cat-tabs" id="catTabs" style="display:none"></div>
+        <div id="catPanels"></div>
+    </div>
+</div>
+
+<button class="music-btn muted" id="musicBtn">
+    <span class="dot"></span>
+    <span id="musicLabel">تشغيل الصوت</span>
+</button>
+
+<audio id="bgAudio"></audio>
+
+<!-- Settings Panel -->
+<div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-panel">
+        <button class="settings-close" id="settingsClose">✕</button>
+        <div class="settings-title">الإعدادات</div>
+
+        <div class="setting-group">
+            <span class="setting-label">الخلفية — صورة أو GIF</span>
+            <div class="file-drop">
+                <input type="file" id="bgFile" accept="image/*,.gif,video/mp4,video/*">
+                <div class="drop-icon">🖼</div>
+                <div class="drop-text">صورة / GIF / MP4 — اسحب أو اضغط</div>
+                <div class="drop-name" id="bgFileName"></div>
+            </div>
+            <div class="toggle-row" style="margin-top:10px">
+                <span class="toggle-label">كتم صوت الفيديو</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="videoMuteToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <span class="setting-label" style="margin-top:14px">إضاءة الخلفية</span>
+            <div class="slider-wrap">
+                <span class="dim-label">مظلم</span>
+                <input type="range" id="brightnessSlider" min="10" max="100" value="45">
+                <span class="dim-label">مضيء</span>
+                <span class="slider-val" id="brightnessVal">45%</span>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <span class="setting-label">الموسيقى / الصوت</span>
+            <div class="file-drop">
+                <input type="file" id="audioFile" accept="audio/*">
+                <div class="drop-icon">🎵</div>
+                <div class="drop-text">اسحب ملف صوتي أو اضغط للاختيار</div>
+                <div class="drop-name" id="audioFileName"></div>
+            </div>
+            <span class="setting-label" style="margin-top:14px">نقطة بداية التشغيل</span>
+            <div class="slider-wrap">
+                <span class="dim-label">0:00</span>
+                <input type="range" id="startTimeSlider" min="0" max="36000" value="94">
+                <span class="dim-label">10h</span>
+                <span class="slider-val" id="startTimeVal">1:34</span>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <span class="setting-label">لون التمييز</span>
+            <div class="color-presets">
+                <div class="color-preset active" style="background:#c9a84c" data-color="#c9a84c"></div>
+                <div class="color-preset" style="background:#e05c5c" data-color="#e05c5c"></div>
+                <div class="color-preset" style="background:#5ce0b0" data-color="#5ce0b0"></div>
+                <div class="color-preset" style="background:#5c9ee0" data-color="#5c9ee0"></div>
+                <div class="color-preset" style="background:#b05ce0" data-color="#b05ce0"></div>
+                <div class="color-preset" style="background:#e0a05c" data-color="#e0a05c"></div>
+                <div class="color-preset" style="background:#e0e0e0" data-color="#e0e0e0"></div>
+            </div>
+            <div class="color-picker-wrap">
+                <span class="color-picker-label">لون مخصص:</span>
+                <input type="color" id="customColor" value="#c9a84c">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <span class="setting-label">خيارات إضافية</span>
+            <div class="toggle-row">
+                <span class="toggle-label">Blur على الخلفية</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="blurToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">تأثير نهاري/ليلي تلقائي</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="dayNightToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <span class="setting-label" style="margin-top:10px">شدة الـ Blur</span>
+            <div class="slider-wrap">
+                <span class="dim-label">0</span>
+                <input type="range" id="blurSlider" min="0" max="20" value="0">
+                <span class="dim-label">20px</span>
+                <span class="slider-val" id="blurVal">0px</span>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <span class="setting-label">شكل المؤشر</span>
+            <div id="cursorGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px"></div>
+            <div class="file-drop" style="margin-top:8px">
+                <input type="file" id="cursorFile" accept=".png,.cur,.svg,image/*">
+                <div class="drop-icon">🖱</div>
+                <div class="drop-text">ارفع مؤشر مخصص (PNG/SVG)</div>
+                <div class="drop-name" id="cursorFileName"></div>
+            </div>
+        </div>
+
+        <button class="save-btn" id="saveBtn">حفظ الإعدادات ✓</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="shortcuts-hint">
+    <span>Space/K</span> موسيقى &nbsp;·&nbsp; <span>M</span> كتم &nbsp;·&nbsp; <span>H</span> إخفاء &nbsp;·&nbsp; <span>↑↓</span> صوت &nbsp;·&nbsp; <span>1-6</span> فئات
+</div>
+
+<!-- Widgets Bar top-right -->
+<div class="widgets-bar draggable" id="widgetsBar"><div class="drag-handle" data-drag="widgetsBar"><span class="drag-grip">⠿</span></div>
+    <div class="weather-widget" id="weatherWidget">
+        <span class="w-icon" id="wIcon">🌡</span>
+        <div>
+            <div class="w-temp" id="wTemp">--°</div>
+            <div id="wDesc" style="font-size:10px;opacity:.5">جاري التحميل</div>
+        </div>
+    </div>
+    <div class="recent-sites" id="recentSites">
+        <div class="recent-title">🕐 آخر المواقع</div>
+        <div id="recentList"></div>
+    </div>
+</div>
+</div>
+
+<!-- Bottom Widgets -->
+<div class="bottom-widgets draggable" id="bottomWidgets"><div class="drag-handle" data-drag="bottomWidgets"><span class="drag-grip">⠿</span></div>
+    <!-- Pomodoro -->
+    <div class="pomodoro" id="pomodoroWidget">
+        <div>
+            <div class="pomo-label" id="pomoLabel">تركيز</div>
+            <div class="pomo-time work" id="pomoTime">25:00</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+            <button class="pomo-btn" id="pomoPlus" title="زيادة دقيقة">＋</button>
+            <button class="pomo-btn" id="pomoMinus" title="إنقاص دقيقة">－</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+            <button class="pomo-btn" id="pomoStart">▶</button>
+            <button class="pomo-btn" id="pomoReset">↺</button>
+        </div>
+    </div>
+    <!-- Notes -->
+    <div class="notes-wrap">
+        <button class="notes-toggle" id="notesToggle">📝 ملاحظات</button>
+        <div class="notes-panel" id="notesPanel">
+            <!-- Notes tabs -->
+            <div class="notes-tabs" id="notesTabs"></div>
+            <textarea class="notes-textarea" id="notesArea" placeholder="اكتب ملاحظاتك هنا..."></textarea>
+            <div class="notes-footer">
+                <span class="notes-count" id="notesCount">0 حرف</span>
+                <div style="display:flex;gap:6px">
+                    <button class="notes-clear" id="notesAddBtn">＋ جديدة</button>
+                    <button class="notes-clear" id="notesRenameBtn">✎ تسمية</button>
+                    <button class="notes-clear" id="notesClear" style="color:#e05c5c">🗑 حذف</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+
+function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)].join(','); }
+function lighten(h){
+    let r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+    return `rgb(${Math.min(255,r+50)},${Math.min(255,g+40)},${Math.min(255,b+30)})`;
+}
+
+// ══════════════════════════════════════════════
+// IndexedDB — يتحمل حتى 1GB+ (للـ GIF والصوت)
+// ══════════════════════════════════════════════
+const DB_NAME='samurai_db', DB_VER=1;
+let db=null;
+
+function openDB(){
+    return new Promise((res,rej)=>{
+        const req=indexedDB.open(DB_NAME,DB_VER);
+        req.onupgradeneeded=e=>{ e.target.result.createObjectStore('files'); };
+        req.onsuccess=e=>{ db=e.target.result; res(db); };
+        req.onerror=e=>rej(e);
+    });
+}
+function dbSet(key,val){
+    return new Promise((res,rej)=>{
+        const tx=db.transaction('files','readwrite');
+        tx.objectStore('files').put(val,key);
+        tx.oncomplete=()=>res();
+        tx.onerror=e=>rej(e);
+    });
+}
+function dbGet(key){
+    return new Promise((res,rej)=>{
+        const tx=db.transaction('files','readonly');
+        const req=tx.objectStore('files').get(key);
+        req.onsuccess=()=>res(req.result);
+        req.onerror=e=>rej(e);
+    });
+}
+
+// ── State ──
+const state = {
+    brightness: +( localStorage.getItem('brightness') || 45 ),
+    startTime:  +( localStorage.getItem('start_time') || 94 ),
+    accent:       localStorage.getItem('accent')      || '#c9a84c',
+};
+
+function applyColor(hex){
+    const rgb = hexToRgb(hex);
+    document.documentElement.style.setProperty('--accent', hex);
+    document.documentElement.style.setProperty('--accent-light', lighten(hex));
+    document.documentElement.style.setProperty('--accent-rgb', rgb);
+    document.documentElement.style.setProperty('--border', `rgba(${rgb},.25)`);
+    document.documentElement.style.setProperty('--border-hover', `rgba(${rgb},.55)`);
+}
+
+function applyBrightness(){
+    const f=`brightness(${state.brightness/100}) saturate(0.8)`;
+    $('bgMedia').style.filter=f;
+    $('bgVideo').style.filter=f;
+}
+
+// تحميل الملفات من IndexedDB عند البداية
+async function initMedia(){
+    try {
+        await openDB();
+        const bgBlob    = await dbGet('bg');
+        const bgType    = await dbGet('bg_type');
+        const audioBlob = await dbGet('audio');
+        if(bgBlob){
+            const url = URL.createObjectURL(bgBlob);
+            if(bgType && bgType.startsWith('video')){
+                setBgVideo(url);
+            } else {
+                setBgImage(url);
+            }
+        } else {
+            setBgImage('samurai.gif');
+        }
+        if(audioBlob) $('bgAudio').src = URL.createObjectURL(audioBlob);
+        else          $('bgAudio').src = 'music.mp3';
+    } catch(e){
+        setBgImage('samurai.gif');
+        $('bgAudio').src = 'music.mp3';
+    }
+    applyBrightness();
+    applyColor(state.accent);
+}
+
+function setBgImage(src){
+    $('bgMedia').src = src;
+    $('bgMedia').style.display = 'block';
+    $('bgVideo').style.display = 'none';
+    $('bgVideo').src = '';
+}
+
+function setBgVideo(src){
+    $('bgVideo').src = src;
+    $('bgVideo').style.display = 'block';
+    $('bgMedia').style.display = 'none';
+    $('bgVideo').muted = localStorage.getItem('videoMuted')!=='0';
+    $('bgVideo').play().catch(()=>{});
+}
+
+initMedia();
+
+// ── Clock ──
+const DAYS   = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+function tick(){
+    const n=new Date();
+    $('hours').textContent=pad(n.getHours());
+    $('minutes').textContent=pad(n.getMinutes());
+    $('seconds').textContent=pad(n.getSeconds());
+    $('dateDisplay').textContent=`${DAYS[n.getDay()]}  ·  ${n.getDate()} ${MONTHS[n.getMonth()]} ${n.getFullYear()}`;
+    const h=n.getHours();
+    $('greetingText').textContent=h<5?'وقت الصمت':h<12?'صباح الخير':h<17?'طاب نهارك':h<21?'مساء الخير':'تصبح على خير';
+}
+tick(); setInterval(tick,1000);
+
+// ── Search + Suggestions ──
+const input = $('searchInput');
+const sugBox = $('suggestions');
+let activeIdx=-1, sugItems=[], debounce=null;
+
+input.addEventListener('input',()=>{
+    const q=input.value.trim();
+    clearTimeout(debounce);
+    if(!q){closeSug();return;}
+    debounce=setTimeout(()=>fetchSug(q),220);
+});
+
+async function fetchSug(q){
+    try{
+        // Google Suggest عبر JSONP — يشتغل بدون CORS
+        const items = await new Promise((res,rej)=>{
+            const cb = 'sg_'+Date.now();
+            const s  = document.createElement('script');
+            const timer = setTimeout(()=>{ cleanup(); rej(); }, 3000);
+            function cleanup(){ delete window[cb]; s.remove(); clearTimeout(timer); }
+            window[cb] = data => { cleanup(); res(data[1]||[]); };
+            s.src = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}&callback=${cb}`;
+            s.onerror = ()=>{ cleanup(); rej(); };
+            document.head.appendChild(s);
+        });
+        renderSug(items.slice(0,7));
+    } catch {
+        closeSug();
+    }
+}
+
+function renderSug(items){
+    if(!items.length){closeSug();return;}
+    sugItems=items; activeIdx=-1;
+    sugBox.innerHTML=items.map((t,i)=>
+        `<div class="suggestion-item" data-i="${i}"><span class="sug-icon">⌕</span><span>${t}</span></div>`
+    ).join('');
+    sugBox.classList.add('open');
+    sugBox.querySelectorAll('.suggestion-item').forEach(el=>{
+        el.addEventListener('mousedown',e=>{e.preventDefault();input.value=el.querySelector('span:last-child').textContent;doSearch(input.value);});
+        el.addEventListener('mouseenter',()=>{activeIdx=+el.dataset.i;highlight();});
+    });
+}
+
+function highlight(){
+    sugBox.querySelectorAll('.suggestion-item').forEach((el,i)=>el.classList.toggle('active',i===activeIdx));
+}
+
+function closeSug(){ sugBox.classList.remove('open'); sugBox.innerHTML=''; sugItems=[]; activeIdx=-1; }
+
+input.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){e.preventDefault();activeIdx=Math.min(activeIdx+1,sugItems.length-1);highlight();if(activeIdx>=0)input.value=sugItems[activeIdx];}
+    else if(e.key==='ArrowUp'){e.preventDefault();activeIdx=Math.max(activeIdx-1,-1);highlight();if(activeIdx>=0)input.value=sugItems[activeIdx];}
+    else if(e.key==='Enter'){closeSug();doSearch(input.value.trim());}
+    else if(e.key==='Escape'){closeSug();}
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.search-wrap')) closeSug(); });
+
+function doSearch(q){
+    if(!q)return;
+    location.href=q.startsWith('http')?q:`https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+
+// ── Music ──
+const audio=$('bgAudio');
+audio.removeAttribute('loop');
+let playing=false;
+
+// تكرار: ended + timeupdate كـ backup إذا الملف قصير جداً
+audio.addEventListener('ended', ()=>{
+    audio.currentTime = state.startTime;
+    audio.play().catch(()=>{});
+});
+
+// إذا الملف انتهى قبل ما يطلق ended (بعض المتصفحات)
+audio.addEventListener('timeupdate', ()=>{
+    if(audio.duration && !audio.paused && audio.currentTime >= audio.duration - 0.1){
+        audio.currentTime = state.startTime;
+        audio.play().catch(()=>{});
+    }
+});
+
+function startMusic(){
+    if(!audio.src || audio.src === window.location.href) return; // لا يوجد ملف
+    audio.currentTime = state.startTime;
+    audio.play().then(()=>{ playing=true; refreshMusicBtn(); }).catch(()=>{});
+}
+function toggleMusic(){
+    if(!audio.src || audio.src === window.location.href){
+        showToast('⚠ حدد ملف موسيقى أولاً'); return;
+    }
+    if(playing){ audio.pause(); playing=false; }
+    else {
+        if(audio.currentTime < state.startTime) audio.currentTime = state.startTime;
+        audio.play().catch(()=>{}); playing=true;
+    }
+    refreshMusicBtn();
+}
+function refreshMusicBtn(){
+    $('musicLabel').textContent = playing ? 'إيقاف الصوت' : 'تشغيل الصوت';
+    $('musicBtn').classList.toggle('muted', !playing);
+}
+$('musicBtn').addEventListener('click', toggleMusic);
+document.body.addEventListener('click', function once(){ startMusic(); document.body.removeEventListener('click',once); }, {once:true});
+
+
+// ── Toast ──
+let toastTimer=null;
+function showToast(msg){
+    const t=$('toast');
+    t.textContent=msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+// ── Keyboard Shortcuts ──
+document.addEventListener('keydown', e => {
+    // تجاهل إذا المستخدم يكتب في البحث
+    if(e.target === $('searchInput')) return;
+    // تجاهل إذا لوحة الإعدادات مفتوحة
+    if(overlay && overlay.classList.contains('visible')) return;
+
+    switch(e.key){
+        case ' ':  // مسافة — تشغيل/إيقاف الصوت
+        case 'k':
+            e.preventDefault();
+            toggleMusic();
+            break;
+        case 'm':  // كتم الصوت
+        case 'M':
+            e.preventDefault();
+            audio.muted = !audio.muted;
+            showToast(audio.muted ? '🔇 كتم الصوت' : '🔊 الصوت مفعّل');
+            break;
+        case 'h':  // إخفاء/إظهار الواجهة
+        case 'H':
+            e.preventDefault();
+            document.body.classList.toggle('ui-hidden');
+            $('hideBtn').textContent = document.body.classList.contains('ui-hidden') ? '🙈' : '👁';
+            break;
+        case 'Escape':
+            if(document.body.classList.contains('ui-hidden')){
+                document.body.classList.remove('ui-hidden');
+                $('hideBtn').textContent = '👁';
+            }
+            break;
+        case 'ArrowUp':   // رفع الصوت
+            e.preventDefault();
+            audio.volume = Math.min(1, audio.volume + 0.1);
+            showToast('🔊 ' + Math.round(audio.volume*100) + '%');
+            break;
+        case 'ArrowDown': // خفض الصوت
+            e.preventDefault();
+            audio.volume = Math.max(0, audio.volume - 0.1);
+            showToast('🔉 ' + Math.round(audio.volume*100) + '%');
+            break;
+    }
+});
+
+// ── Settings ──
+const overlay=$('settingsOverlay');
+
+function openSettings(){
+    overlay.style.display='flex';
+    requestAnimationFrame(()=>overlay.classList.add('visible'));
+    $('brightnessSlider').value=state.brightness;
+    $('brightnessVal').textContent=state.brightness+'%';
+    $('startTimeSlider').value=state.startTime;
+    $('startTimeVal').textContent=toTime(state.startTime);
+    $('customColor').value=state.accent;
+    document.querySelectorAll('.color-preset').forEach(el=>el.classList.toggle('active',el.dataset.color===state.accent));
+}
+function closeSettings(){ overlay.classList.remove('visible'); setTimeout(()=>{overlay.style.display='none';},300); }
+
+$('settingsBtn').addEventListener('click',e=>{e.stopPropagation();openSettings();});
+$('settingsClose').addEventListener('click',closeSettings);
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeSettings();});
+
+$('brightnessSlider').addEventListener('input',function(){
+    $('brightnessVal').textContent=this.value+'%';
+    $('bgMedia').style.filter=`brightness(${this.value/100}) saturate(0.8)`;
+});
+$('startTimeSlider').addEventListener('input',function(){ $('startTimeVal').textContent=toTime(+this.value); });
+function toTime(s){ return Math.floor(s/60)+':'+pad(s%60); }
+
+// File: background — يُخزن في IndexedDB (يتحمل حتى 1GB)
+let pendingBgFile=null, pendingAudioFile=null;
+
+$('bgFile').addEventListener('change',function(){
+    const f=this.files[0]; if(!f)return;
+    pendingBgFile=f;
+    const url=URL.createObjectURL(f);
+    if(f.type.startsWith('video')){
+        setBgVideo(url);
+    } else {
+        setBgImage(url);
+    }
+    $('bgFileName').textContent='✓ '+f.name;
+    $('bgFileName').style.display='block';
+});
+
+// File: audio
+$('audioFile').addEventListener('change',function(){
+    const f=this.files[0]; if(!f)return;
+    pendingAudioFile=f;
+    audio.src=URL.createObjectURL(f);
+    $('audioFileName').textContent='✓ '+f.name;
+    $('audioFileName').style.display='block';
+});
+
+// Color presets
+document.querySelectorAll('.color-preset').forEach(el=>{
+    el.addEventListener('click',()=>{
+        document.querySelectorAll('.color-preset').forEach(p=>p.classList.remove('active'));
+        el.classList.add('active');
+        $('customColor').value=el.dataset.color;
+        applyColor(el.dataset.color);
+    });
+});
+$('customColor').addEventListener('input',function(){
+    document.querySelectorAll('.color-preset').forEach(p=>p.classList.remove('active'));
+    applyColor(this.value);
+});
+
+// Video mute toggle
+const vmt = $('videoMuteToggle');
+if(vmt){
+    vmt.checked = localStorage.getItem('videoMuted')!=='0';
+    vmt.addEventListener('change',()=>{
+        $('bgVideo').muted=vmt.checked;
+        localStorage.setItem('videoMuted',vmt.checked?'1':'0');
+    });
+}
+
+// Save
+$('saveBtn').addEventListener('click', async ()=>{
+    state.brightness=+$('brightnessSlider').value;
+    state.startTime=+$('startTimeSlider').value;
+    state.accent=$('customColor').value;
+
+    localStorage.setItem('brightness', state.brightness);
+    localStorage.setItem('start_time', state.startTime);
+    localStorage.setItem('accent',     state.accent);
+    applyBrightness();
+
+    $('saveBtn').textContent='جاري الحفظ...';
+
+    try {
+        if(pendingBgFile){
+            await dbSet('bg', pendingBgFile);
+            await dbSet('bg_type', pendingBgFile.type);
+            pendingBgFile=null;
+        }
+        if(pendingAudioFile){
+            await dbSet('audio', pendingAudioFile);
+            if(playing){ audio.currentTime=state.startTime; audio.play(); }
+            pendingAudioFile=null;
+        }
+        $('saveBtn').textContent='تم الحفظ ✓';
+    } catch(e){
+        $('saveBtn').textContent='خطأ في الحفظ!';
+    }
+    setTimeout(()=>{ $('saveBtn').textContent='حفظ الإعدادات ✓'; closeSettings(); },1000);
+});
+
+// ── Hide UI ──
+const hideBtn=$("hideBtn");
+hideBtn.addEventListener("click",e=>{
+    e.stopPropagation();
+    document.body.classList.toggle("ui-hidden");
+    hideBtn.textContent=document.body.classList.contains("ui-hidden")?"🙈":"👁";
+});
+document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&document.body.classList.contains("ui-hidden")){
+        document.body.classList.remove("ui-hidden");
+        hideBtn.textContent="👁";
+    }
+});
+
+// ── Categories ──
+const DEFAULT_CATS = [
+    {
+        id:'movies', label:'🎬 أفلام', builtin:true,
+        links:[
+            {icon:'🎥', name:'سينمانا',    url:'https://cinemana.vip/movies/'},
+            {icon:'🎞', name:'السينما',     url:'https://elcinema.com/tvsummary/1/ar'},
+            {icon:'📺', name:'يوتيوب',     url:'https://youtube.com'},
+        ]
+    },
+    {
+        id:'anime', label:'⛩ أنمي', builtin:true,
+        links:[
+            {icon:'🌸', name:'أنمي عرب',   url:'https://anime3rb.com/'},
+            {icon:'🗡', name:'WIT Anime',   url:'https://witanime.you/'},
+            {icon:'⚔', name:'Anime4Up',    url:'https://w1.anime4up.rest/'},
+        ]
+    },
+    {
+        id:'games', label:'🎮 ألعاب', builtin:true,
+        links:[
+            {icon:'💀', name:'Sans Fight',  url:'https://jcw87.github.io/c2-sans-fight/index.html'},
+            {icon:'🎯', name:'CrazyGames',  url:'https://www.crazygames.com/'},
+            {icon:'🕹', name:'Flash Museum',url:'https://flashmuseum.org/'},
+        ]
+    },
+    {
+        id:'social', label:'💬 سوشل', builtin:true,
+        links:[
+            {icon:'𝕏',  name:'تويتر',       url:'https://twitter.com'},
+            {icon:'▶',  name:'يوتيوب',      url:'https://youtube.com'},
+            {icon:'◈',  name:'ريديت',       url:'https://reddit.com'},
+            {icon:'📸', name:'إنستقرام',    url:'https://instagram.com'},
+            {icon:'💬', name:'تيليغرام',    url:'https://web.telegram.org'},
+        ]
+    },
+    {
+        id:'ai', label:'🤖 AI', builtin:true,
+        links:[
+            {icon:'◉',  name:'Claude',       url:'https://claude.ai'},
+            {icon:'🧠', name:'ChatGPT',      url:'https://chat.openai.com'},
+            {icon:'♊', name:'Gemini',        url:'https://gemini.google.com'},
+            {icon:'🦅', name:'Grok',         url:'https://grok.x.ai'},
+            {icon:'🔍', name:'Perplexity',   url:'https://perplexity.ai'},
+        ]
+    }
+];
+
+// Load custom categories from localStorage
+function loadCustomCats(){
+    try{ return JSON.parse(localStorage.getItem('custom_cats')||'[]'); }
+    catch{ return []; }
+}
+function saveCustomCats(arr){
+    localStorage.setItem('custom_cats', JSON.stringify(arr));
+}
+
+let CATS = [...DEFAULT_CATS, ...loadCustomCats()];
+let activeCat = localStorage.getItem('active_cat') || 'movies';
+
+function buildCats(){
+    const tabsEl   = $('catTabs');
+    const panelsEl = $('catPanels');
+    tabsEl.innerHTML = '';
+    panelsEl.innerHTML = '';
+
+    CATS.forEach(cat => {
+        // ── Tab ──
+        const tabWrap = document.createElement('div');
+        tabWrap.style.cssText='display:flex;align-items:center;gap:3px;flex-shrink:0;';
+
+        const tab = document.createElement('button');
+        tab.className = 'cat-tab' + (cat.id===activeCat?' active':'');
+        tab.textContent = cat.label;
+        tab.dataset.id = cat.id;
+        tab.addEventListener('click', ()=> switchCat(cat.id));
+        tabWrap.appendChild(tab);
+
+        // Delete button for custom cats
+        if(!cat.builtin){
+            const del = document.createElement('button');
+            del.style.cssText='background:none;border:none;color:rgba(255,255,255,.25);font-size:11px;cursor:none;padding:2px 4px;transition:color .2s;flex-shrink:0;';
+            del.textContent='✕';
+            del.addEventListener('mouseenter',()=>del.style.color='#e05c5c');
+            del.addEventListener('mouseleave',()=>del.style.color='rgba(255,255,255,.25)');
+            del.addEventListener('click',e=>{ e.stopPropagation(); deleteCustomCat(cat.id); });
+            tabWrap.appendChild(del);
+        }
+        tabsEl.appendChild(tabWrap);
+
+        // ── Panel ──
+        const grid = document.createElement('div');
+        grid.className = 'links-grid' + (cat.id===activeCat?' active':'');
+        grid.id = 'cat-' + cat.id;
+
+        cat.links.forEach(lk => {
+            const a = document.createElement('a');
+            a.className = 'quick-link';
+            a.href = lk.url;
+            a.target = '_blank';
+            a.innerHTML = `<span class="icon">${lk.icon}</span><span>${lk.name}</span>`;
+            grid.appendChild(a);
+        });
+
+        // Add link button for every category
+        const addLinkBtn = document.createElement('button');
+        addLinkBtn.className = 'quick-link';
+        addLinkBtn.style.cssText='border-style:dashed;cursor:none;opacity:.5;';
+        addLinkBtn.innerHTML='<span class="icon">＋</span><span>رابط</span>';
+        addLinkBtn.addEventListener('click', ()=> addLinkToCat(cat.id));
+        grid.appendChild(addLinkBtn);
+
+        panelsEl.appendChild(grid);
+    });
+
+    // ── "Add Category" tab button ──
+    const addCatBtn = document.createElement('button');
+    addCatBtn.className = 'cat-tab';
+    addCatBtn.style.cssText='border-style:dashed;opacity:.5;flex-shrink:0;';
+    addCatBtn.textContent = '＋ فئة';
+    addCatBtn.addEventListener('click', addNewCategory);
+    tabsEl.appendChild(addCatBtn);
+
+    requestAnimationFrame(()=> attachHover('.quick-link,.cat-tab'));
+}
+
+function switchCat(id){
+    activeCat = id;
+    localStorage.setItem('active_cat', id);
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.id===id));
+    document.querySelectorAll('.links-grid').forEach(g => {
+        const isTarget = g.id === 'cat-' + id;
+        if(isTarget){
+            g.classList.add('active');
+            g.style.animation = 'none';
+            g.offsetHeight;
+            g.style.animation = '';
+        } else {
+            g.classList.remove('active');
+        }
+    });
+}
+
+function addNewCategory(){
+    const label = prompt('اسم الفئة (مع إيموجي):');
+    if(!label) return;
+    const id = 'cat_' + Date.now();
+    const newCat = { id, label, builtin:false, links:[] };
+    CATS.push(newCat);
+    const customs = CATS.filter(c=>!c.builtin);
+    saveCustomCats(customs);
+    buildCats();
+    switchCat(id);
+    showToast('✓ تمت إضافة الفئة');
+}
+
+function deleteCustomCat(id){
+    if(!confirm('حذف هذه الفئة؟')) return;
+    CATS = CATS.filter(c=>c.id!==id);
+    saveCustomCats(CATS.filter(c=>!c.builtin));
+    if(activeCat===id) activeCat='movies';
+    buildCats();
+    switchCat(activeCat);
+}
+
+function addLinkToCat(catId){
+    const name = prompt('اسم الرابط:');
+    if(!name) return;
+    const url = prompt('الرابط (https://...):');
+    if(!url) return;
+    const icon = prompt('رمز (إيموجي):') || '🔗';
+    const cat = CATS.find(c=>c.id===catId);
+    if(!cat) return;
+    cat.links.push({icon, name, url});
+    if(!cat.builtin) saveCustomCats(CATS.filter(c=>!c.builtin));
+    buildCats();
+    switchCat(catId);
+}
+
+// ── Layout Mode ──
+let catLayoutMode = localStorage.getItem('cat_layout') || 'carousel';
+let carouselIdx = 0; // index of center item
+
+function applyLayoutMode(mode){
+    catLayoutMode = mode;
+    localStorage.setItem('cat_layout', mode);
+    const wrap=$('catsWrap');
+    wrap.className='cats-wrap mode-'+mode;
+    const car=$('catCarousel'), tabs=$('catTabs');
+    document.querySelectorAll('.lm-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+    if(mode==='carousel'){
+        car.style.display='flex';
+        tabs.style.display='none';
+        renderCarousel();
+    } else {
+        car.style.display='none';
+        tabs.style.display='flex';
+    }
+}
+
+function renderCarousel(){
+    const track=$('carTrack'); if(!track) return;
+    // show center ±2
+    const visible=[];
+    for(let d=-2;d<=2;d++){
+        let i=(carouselIdx+d+CATS.length)%CATS.length;
+        visible.push({cat:CATS[i],d});
+    }
+    track.innerHTML=visible.map(({cat,d})=>{
+        const cls = d===0?'center':Math.abs(d)===1?'side':'far';
+        return `<div class="car-item ${cls}" data-id="${cat.id}">${cat.label}</div>`;
+    }).join('');
+    track.querySelectorAll('.car-item').forEach(el=>{
+        el.addEventListener('click',()=>{
+            const idx=CATS.findIndex(c=>c.id===el.dataset.id);
+            if(idx>=0){ carouselIdx=idx; renderCarousel(); switchCat(CATS[idx].id); }
+        });
+    });
+    // sync active cat
+    const centerCat=CATS[carouselIdx];
+    if(centerCat) switchCat(centerCat.id);
+}
+
+$('carPrev')?.addEventListener('click',()=>{
+    carouselIdx=(carouselIdx-1+CATS.length)%CATS.length;
+    renderCarousel();
+});
+$('carNext')?.addEventListener('click',()=>{
+    carouselIdx=(carouselIdx+1)%CATS.length;
+    renderCarousel();
+});
+
+document.querySelectorAll('.lm-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>applyLayoutMode(btn.dataset.mode));
+});
+
+// Keyboard shortcuts 1-9 for categories
+document.addEventListener('keydown', e => {
+    if(e.target === $('searchInput')) return;
+    const num = parseInt(e.key);
+    if(num >= 1 && num <= 9){
+        const cat = CATS[num-1];
+        if(cat){
+            const idx=CATS.findIndex(c=>c.id===cat.id);
+            carouselIdx=idx>=0?idx:0;
+            if(catLayoutMode==='carousel') renderCarousel();
+            else switchCat(cat.id);
+            showToast('📂 ' + cat.label);
+        }
+    }
+});
+
+buildCats();
+// Set initial carousel idx to match activeCat
+carouselIdx = Math.max(0, CATS.findIndex(c=>c.id===activeCat));
+applyLayoutMode(catLayoutMode);
+
+// ── Cat Tabs Drag Scroll ──
+(function initDragScroll(){
+    const tabs = $('catTabs');
+    if(!tabs) return;
+    let isDown=false, startX=0, scrollLeft=0, moved=false;
+
+    tabs.addEventListener('mousedown', e=>{
+        isDown=true; moved=false;
+        startX = e.pageX - tabs.offsetLeft;
+        scrollLeft = tabs.scrollLeft;
+        tabs.classList.add('dragging');
+    });
+    document.addEventListener('mouseup', e=>{
+        if(!isDown) return;
+        isDown=false;
+        tabs.classList.remove('dragging');
+    });
+    document.addEventListener('mousemove', e=>{
+        if(!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - tabs.offsetLeft;
+        const walk = (x - startX) * 1.2;
+        if(Math.abs(walk) > 4) moved=true;
+        tabs.scrollLeft = scrollLeft - walk;
+    });
+
+    // prevent tab click if we dragged
+    tabs.addEventListener('click', e=>{
+        if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; }
+    }, true);
+
+    // Touch support
+    let tStartX=0, tScrollLeft=0;
+    tabs.addEventListener('touchstart', e=>{ tStartX=e.touches[0].pageX; tScrollLeft=tabs.scrollLeft; },{passive:true});
+    tabs.addEventListener('touchmove',  e=>{
+        const dx = e.touches[0].pageX - tStartX;
+        tabs.scrollLeft = tScrollLeft - dx;
+    },{passive:true});
+})();
+
+// ══════════════════════════════════════════
+//  DRAGGABLE WIDGETS
+// ══════════════════════════════════════════
+function initDraggable(){
+    document.querySelectorAll('.draggable').forEach(el=>{
+        const id = el.id;
+        // Restore saved position
+        const saved = localStorage.getItem('pos_'+id);
+        if(saved){
+            try{
+                const {x,y}=JSON.parse(saved);
+                el.style.left=x+'px'; el.style.top=y+'px';
+                el.style.right='auto'; el.style.bottom='auto';
+            }catch{}
+        }
+
+        const handle = el.querySelector('.drag-handle');
+        if(!handle) return;
+        let dragging=false, ox=0, oy=0;
+
+        handle.addEventListener('mousedown',e=>{
+            if(e.button!==0) return;
+            dragging=true;
+            const r=el.getBoundingClientRect();
+            ox=e.clientX-r.left; oy=e.clientY-r.top;
+            el.style.transition='none';
+            el.style.right='auto'; el.style.bottom='auto';
+            document.body.style.userSelect='none';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove',e=>{
+            if(!dragging) return;
+            let x=e.clientX-ox, y=e.clientY-oy;
+            // clamp inside viewport
+            x=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,x));
+            y=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,y));
+            el.style.left=x+'px'; el.style.top=y+'px';
+        });
+
+        document.addEventListener('mouseup',()=>{
+            if(!dragging) return;
+            dragging=false;
+            document.body.style.userSelect='';
+            localStorage.setItem('pos_'+id, JSON.stringify({
+                x:parseInt(el.style.left), y:parseInt(el.style.top)
+            }));
+        });
+    });
+}
+initDraggable();
+
+// ── Cursor ──
+const cur=$('cursor'), ring=$('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+
+document.addEventListener('mousemove',e=>{
+    mx=e.clientX; my=e.clientY;
+    cur.style.left=mx-3+'px';
+    cur.style.top =my-3+'px';
+});
+
+(function animRing(){
+    rx+=(mx-rx-14)*.1;
+    ry+=(my-ry-14)*.1;
+    ring.style.left=rx+'px';
+    ring.style.top =ry+'px';
+    requestAnimationFrame(animRing);
+})();
+
+function attachHover(sel){
+    document.querySelectorAll(sel).forEach(el=>{
+        if(el._hoverAttached) return;
+        el._hoverAttached=true;
+        el.addEventListener('mouseenter',()=>{cur.style.transform='scale(2)';ring.style.width='46px';ring.style.height='46px';});
+        el.addEventListener('mouseleave',()=>{cur.style.transform='scale(1)';ring.style.width='28px';ring.style.height='28px';});
+    });
+}
+
+// Initial attach
+attachHover('a,button,input,.color-preset,.file-drop');
+
+
+
+// ══════════════════════════════════════════
+//  DAY / NIGHT
+// ══════════════════════════════════════════
+function applyDayNight(){
+    if(localStorage.getItem('daynight')==='0') return;
+    const h=new Date().getHours(), o=$('dayNightOverlay'); if(!o) return;
+    if(h>=6&&h<18)        o.style.background='transparent';
+    else if(h>=18&&h<22)  o.style.background='rgba(60,20,0,.10)';
+    else                  o.style.background='rgba(0,10,40,.18)';
+}
+applyDayNight();
+setInterval(applyDayNight,60000);
+
+// ══════════════════════════════════════════
+//  BLUR
+// ══════════════════════════════════════════
+function applyBlur(px){
+    const base=`brightness(${state.brightness/100}) saturate(0.8)`;
+    $('bgMedia').style.filter = px>0 ? base+` blur(${px}px)` : base;
+    $('bgMedia').style.transform = px>0 ? 'scale(1.03)' : '';
+}
+const savedBlur=+(localStorage.getItem('blur')||0);
+if(savedBlur>0) applyBlur(savedBlur);
+
+$('blurSlider').addEventListener('input',function(){
+    $('blurVal').textContent=this.value+'px';
+    applyBlur(+this.value);
+});
+$('blurToggle').addEventListener('change',function(){
+    if(!this.checked){$('blurSlider').value=0;$('blurVal').textContent='0px';applyBlur(0);}
+});
+$('dayNightToggle').addEventListener('change',function(){
+    localStorage.setItem('daynight',this.checked?'1':'0');
+    if(!this.checked){const o=$('dayNightOverlay');if(o)o.style.background='transparent';}
+    else applyDayNight();
+});
+
+const _origOpen=openSettings;
+openSettings=function(){
+    _origOpen();
+    const bv=+(localStorage.getItem('blur')||0);
+    $('blurSlider').value=bv; $('blurVal').textContent=bv+'px';
+    $('blurToggle').checked=bv>0;
+    $('dayNightToggle').checked=localStorage.getItem('daynight')!=='0';
+};
+$('saveBtn').addEventListener('click',()=>{ localStorage.setItem('blur',$('blurSlider').value); });
+
+// ══════════════════════════════════════════
+//  WEATHER
+// ══════════════════════════════════════════
+const W_ICONS={0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',48:'🌫',51:'🌦',53:'🌦',55:'🌧',
+    61:'🌧',63:'🌧',65:'🌧',71:'❄️',73:'❄️',75:'❄️',80:'🌦',81:'🌧',82:'⛈',95:'⛈',96:'⛈',99:'⛈'};
+
+async function doWeather(lat,lon,city){
+    const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`).then(r=>r.json());
+    const t=Math.round(w.current_weather.temperature), c=w.current_weather.weathercode;
+    $('wTemp').textContent=t+'°';
+    $('wIcon').textContent=W_ICONS[c]||'🌡';
+    $('wDesc').textContent=city||'';
+}
+
+function loadWeather(){
+    // لا نسأل عن الموقع تلقائياً — نستخدم IP فقط (لا popup مزعج)
+    // المستخدم يضغط على widget الطقس يدوياً للسماح بالـ GPS
+    const perm = localStorage.getItem('geo_perm');
+    if(perm==='granted'){
+        navigator.geolocation.getCurrentPosition(
+            p=>doWeather(p.coords.latitude,p.coords.longitude,'').catch(wByIP),
+            wByIP, {timeout:5000}
+        );
+    } else {
+        wByIP();
+    }
+}
+
+// ضغطة على widget الطقس = طلب GPS يدوي
+document.getElementById('weatherWidget')?.addEventListener('click',()=>{
+    if(localStorage.getItem('geo_perm')==='granted'){ loadWeather(); return; }
+    navigator.geolocation?.getCurrentPosition(
+        p=>{ localStorage.setItem('geo_perm','granted'); doWeather(p.coords.latitude,p.coords.longitude,'').catch(wByIP); },
+        ()=>{ localStorage.setItem('geo_perm','denied'); showToast('📍 استخدم IP بدلاً من GPS'); wByIP(); },
+        {timeout:8000}
+    );
+    showToast('📍 جاري طلب الموقع...');
+});
+
+function wByIP(){
+    fetch('https://ipapi.co/json/')
+        .then(r=>r.json())
+        .then(g=>doWeather(g.latitude,g.longitude,g.city))
+        .catch(()=>wErr());
+}
+
+function wErr(){
+    $('wTemp').textContent='--°';
+    $('wDesc').textContent='لا يتوفر';
+    $('wIcon').textContent='🌡';
+}
+
+loadWeather();
+
+// ══════════════════════════════════════════
+//  RECENT SITES
+// ══════════════════════════════════════════
+function getRecent(){ try{return JSON.parse(localStorage.getItem('recent_sites')||'[]');}catch{return[];} }
+
+function addRecent(url,title){
+    try{
+        let list=getRecent().filter(r=>r.url!==url);
+        list.unshift({url,title:title||new URL(url).hostname,
+            favicon:`https://www.google.com/s2/favicons?sz=32&domain=${new URL(url).hostname}`});
+        localStorage.setItem('recent_sites',JSON.stringify(list.slice(0,5)));
+    }catch{}
+}
+
+function renderRecent(){
+    const el=$('recentList'); if(!el) return;
+    const list=getRecent();
+    if(!list.length){
+        el.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.25);padding:5px 6px">افتح روابط لتظهر هنا</div>';
+        return;
+    }
+    el.innerHTML=list.map(r=>
+        `<a class="recent-item" href="${r.url}" target="_blank">
+            <img src="${r.favicon}" width="14" height="14" onerror="this.remove()">
+            <span>${r.title}</span>
+        </a>`
+    ).join('');
+    attachHover('.recent-item');
+}
+renderRecent();
+
+document.addEventListener('click',e=>{
+    const a=e.target.closest('a.quick-link');
+    if(a&&a.href&&a.href.startsWith('http')){
+        const title=a.querySelector('span:last-child')?.textContent?.trim()||'';
+        addRecent(a.href,title);
+        setTimeout(renderRecent,80);
+    }
+});
+
+// ══════════════════════════════════════════
+//  POMODORO — قابل للتعديل
+// ══════════════════════════════════════════
+let pomoWorkMins = +(localStorage.getItem('pomo_work')||25);
+let pomoRestMins = +(localStorage.getItem('pomo_rest')||5);
+let pomoRunning=false, pomoInterval=null;
+let pomoMode='work';
+let pomoSecs = pomoWorkMins*60;
+
+function renderPomo(){
+    const t=$('pomoTime'); if(!t) return;
+    t.textContent=pad(Math.floor(pomoSecs/60))+':'+pad(pomoSecs%60);
+    t.className='pomo-time '+(pomoMode==='work'?'work':'rest');
+    const l=$('pomoLabel'); if(l) l.textContent=pomoMode==='work'?`تركيز ${pomoWorkMins}د`:`استراحة ${pomoRestMins}د`;
+    const b=$('pomoStart'); if(b) b.textContent=pomoRunning?'⏸':'▶';
+}
+
+function pomoTick(){
+    pomoSecs--;
+    if(pomoSecs<0){
+        clearInterval(pomoInterval); pomoInterval=null; pomoRunning=false;
+        pomoMode=pomoMode==='work'?'rest':'work';
+        pomoSecs=pomoMode==='work'?pomoWorkMins*60:pomoRestMins*60;
+        showToast(pomoMode==='work'?'🎯 وقت التركيز!':'☕ وقت الراحة!');
+    }
+    renderPomo();
+}
+
+$('pomoStart').addEventListener('click',()=>{
+    if(pomoRunning){ clearInterval(pomoInterval); pomoInterval=null; pomoRunning=false; }
+    else { pomoInterval=setInterval(pomoTick,1000); pomoRunning=true; }
+    renderPomo();
+});
+
+$('pomoReset').addEventListener('click',()=>{
+    clearInterval(pomoInterval); pomoInterval=null; pomoRunning=false;
+    pomoMode='work'; pomoSecs=pomoWorkMins*60; renderPomo();
+});
+
+$('pomoPlus')?.addEventListener('click',()=>{
+    if(pomoMode==='work'){ pomoWorkMins=Math.min(90,pomoWorkMins+1); localStorage.setItem('pomo_work',pomoWorkMins); }
+    else { pomoRestMins=Math.min(30,pomoRestMins+1); localStorage.setItem('pomo_rest',pomoRestMins); }
+    if(!pomoRunning) pomoSecs=(pomoMode==='work'?pomoWorkMins:pomoRestMins)*60;
+    renderPomo(); showToast((pomoMode==='work'?'تركيز':'استراحة')+': '+(pomoMode==='work'?pomoWorkMins:pomoRestMins)+'د');
+});
+
+$('pomoMinus')?.addEventListener('click',()=>{
+    if(pomoMode==='work'){ pomoWorkMins=Math.max(1,pomoWorkMins-1); localStorage.setItem('pomo_work',pomoWorkMins); }
+    else { pomoRestMins=Math.max(1,pomoRestMins-1); localStorage.setItem('pomo_rest',pomoRestMins); }
+    if(!pomoRunning) pomoSecs=(pomoMode==='work'?pomoWorkMins:pomoRestMins)*60;
+    renderPomo(); showToast((pomoMode==='work'?'تركيز':'استراحة')+': '+(pomoMode==='work'?pomoWorkMins:pomoRestMins)+'د');
+});
+
+renderPomo();
+
+// ══════════════════════════════════════════
+//  NOTES — متعددة بأسماء
+// ══════════════════════════════════════════
+(function initNotes(){
+    const area=$('notesArea'), panel=$('notesPanel'), toggle=$('notesToggle');
+    const countEl=$('notesCount'), tabsEl=$('notesTabs');
+    if(!area||!panel||!toggle) return;
+
+    function loadAllNotes(){ try{ return JSON.parse(localStorage.getItem('notes_list')||'null') || [{id:'n1',name:'ملاحظة 1',text:''}]; }catch{ return [{id:'n1',name:'ملاحظة 1',text:''}]; } }
+    function saveAllNotes(){ localStorage.setItem('notes_list', JSON.stringify(notes)); }
+
+    let notes = loadAllNotes();
+    let activeNoteId = localStorage.getItem('active_note') || notes[0].id;
+
+    function getActive(){ return notes.find(n=>n.id===activeNoteId) || notes[0]; }
+
+    function renderTabs(){
+        tabsEl.innerHTML = notes.map(n=>
+            `<button class="note-tab ${n.id===activeNoteId?'active':''}" data-id="${n.id}">${n.name}</button>`
+        ).join('');
+        tabsEl.querySelectorAll('.note-tab').forEach(btn=>{
+            btn.addEventListener('click',e=>{ e.stopPropagation(); switchNote(btn.dataset.id); });
+        });
+    }
+
+    function switchNote(id){
+        // Save current
+        const cur=getActive(); cur.text=area.value; saveAllNotes();
+        activeNoteId=id; localStorage.setItem('active_note',id);
+        const n=getActive();
+        area.value=n.text;
+        countEl.textContent=n.text.length+' حرف';
+        renderTabs();
+        area.focus();
+    }
+
+    // Load active
+    area.value=getActive().text;
+    countEl.textContent=area.value.length+' حرف';
+    renderTabs();
+
+    toggle.addEventListener('click',e=>{
+        e.stopPropagation();
+        const open=panel.classList.toggle('open');
+        if(open) setTimeout(()=>area.focus(),60);
+    });
+    document.addEventListener('click',e=>{
+        if(!e.target.closest('.notes-wrap')) panel.classList.remove('open');
+    });
+    area.addEventListener('keydown',e=>e.stopPropagation());
+    area.addEventListener('keyup',  e=>e.stopPropagation());
+    area.addEventListener('input',()=>{
+        getActive().text=area.value;
+        saveAllNotes();
+        countEl.textContent=area.value.length+' حرف';
+    });
+
+    $('notesAddBtn')?.addEventListener('click',e=>{
+        e.stopPropagation();
+        const name=prompt('اسم الملاحظة الجديدة:','ملاحظة '+(notes.length+1));
+        if(!name) return;
+        const id='n'+Date.now();
+        notes.push({id,name,text:''});
+        saveAllNotes();
+        switchNote(id);
+    });
+    $('notesRenameBtn')?.addEventListener('click',e=>{
+        e.stopPropagation();
+        const n=getActive();
+        const name=prompt('اسم جديد:',n.name);
+        if(!name) return;
+        n.name=name; saveAllNotes(); renderTabs();
+    });
+    $('notesClear')?.addEventListener('click',e=>{
+        e.stopPropagation();
+        if(notes.length===1){
+            if(!confirm('مسح محتوى الملاحظة؟')) return;
+            notes[0].text=''; area.value=''; saveAllNotes(); countEl.textContent='0 حرف'; return;
+        }
+        if(!confirm('حذف هذه الملاحظة؟')) return;
+        notes=notes.filter(n=>n.id!==activeNoteId);
+        saveAllNotes();
+        activeNoteId=notes[notes.length-1].id;
+        area.value=getActive().text;
+        countEl.textContent=area.value.length+' حرف';
+        renderTabs();
+    });
+})();
+
+
+// ══════════════════════════════════════════
+//  CURSOR STYLES — 30 شكل
+// ══════════════════════════════════════════
+const CURSOR_STYLES = [
+    {id:'default',  label:'افتراضي',   dot:{w:6,h:6,bg:'var(--accent)',br:'50%'},       ring:{w:28,h:28,b:'1px solid rgba(var(--accent-rgb),.5)',br:'50%'}},
+    {id:'cross',    label:'تقاطع',     dot:{w:2,h:16,bg:'var(--accent)',br:'0'},         ring:{w:16,h:2,bg:'var(--accent)',br:'0'}},
+    {id:'square',   label:'مربع',      dot:{w:8,h:8,bg:'var(--accent)',br:'2px'},        ring:{w:24,h:24,b:'1px solid var(--accent)',br:'2px'}},
+    {id:'diamond',  label:'ماسة',      dot:{w:8,h:8,bg:'var(--accent)',br:'0',tr:'rotate(45deg)'}, ring:{w:20,h:20,b:'1px solid var(--accent)',br:'0',tr:'rotate(45deg)'}},
+    {id:'dot',      label:'نقطة كبيرة',dot:{w:12,h:12,bg:'#fff',br:'50%'},              ring:{w:0,h:0}},
+    {id:'ring',     label:'حلقة فقط',  dot:{w:0,h:0},                                   ring:{w:22,h:22,b:'2px solid var(--accent)',br:'50%'}},
+    {id:'plus',     label:'زائد',      dot:{w:2,h:14,bg:'#fff',br:'0'},                 ring:{w:14,h:2,bg:'#fff',br:'0'}},
+    {id:'red',      label:'أحمر',      dot:{w:8,h:8,bg:'#e05c5c',br:'50%'},             ring:{w:26,h:26,b:'1px solid #e05c5c',br:'50%'}},
+    {id:'blue',     label:'أزرق',      dot:{w:8,h:8,bg:'#5c9ee0',br:'50%'},             ring:{w:26,h:26,b:'1px solid #5c9ee0',br:'50%'}},
+    {id:'green',    label:'أخضر',      dot:{w:8,h:8,bg:'#5ce0b0',br:'50%'},             ring:{w:26,h:26,b:'1px solid #5ce0b0',br:'50%'}},
+    {id:'purple',   label:'بنفسجي',    dot:{w:8,h:8,bg:'#b05ce0',br:'50%'},             ring:{w:26,h:26,b:'1px solid #b05ce0',br:'50%'}},
+    {id:'white',    label:'أبيض',      dot:{w:8,h:8,bg:'#fff',br:'50%'},                ring:{w:26,h:26,b:'1px solid rgba(255,255,255,.6)',br:'50%'}},
+    {id:'tiny',     label:'صغير',      dot:{w:3,h:3,bg:'var(--accent)',br:'50%'},        ring:{w:14,h:14,b:'1px solid var(--accent)',br:'50%'}},
+    {id:'large',    label:'كبير',      dot:{w:12,h:12,bg:'var(--accent)',br:'50%'},      ring:{w:44,h:44,b:'1px solid var(--accent)',br:'50%'}},
+    {id:'noring',   label:'بلا حلقة',  dot:{w:8,h:8,bg:'var(--accent)',br:'50%'},        ring:{w:0,h:0}},
+    {id:'nodot',    label:'بلا نقطة',  dot:{w:0,h:0},                                   ring:{w:30,h:30,b:'1px solid var(--accent)',br:'50%'}},
+    {id:'glow',     label:'توهج',      dot:{w:8,h:8,bg:'#fff',br:'50%',sh:'0 0 12px 4px var(--accent)'}, ring:{w:32,h:32,b:'none',bg:'rgba(var(--accent-rgb),.1)',br:'50%'}},
+    {id:'inverse',  label:'معكوس',     dot:{w:8,h:8,bg:'#fff',br:'50%',blend:'difference'}, ring:{w:28,h:28,b:'2px solid #fff',br:'50%',blend:'difference'}},
+    {id:'dashed',   label:'منقط',      dot:{w:6,h:6,bg:'var(--accent)',br:'50%'},        ring:{w:28,h:28,b:'1px dashed var(--accent)',br:'50%'}},
+    {id:'thick',    label:'سميك',      dot:{w:6,h:6,bg:'var(--accent)',br:'50%'},        ring:{w:28,h:28,b:'3px solid var(--accent)',br:'50%'}},
+    {id:'rect',     label:'مستطيل',    dot:{w:10,h:4,bg:'var(--accent)',br:'1px'},       ring:{w:28,h:20,b:'1px solid var(--accent)',br:'2px'}},
+    {id:'pill',     label:'حبة دواء',  dot:{w:14,h:6,bg:'var(--accent)',br:'6px'},       ring:{w:34,h:16,b:'1px solid var(--accent)',br:'8px'}},
+    {id:'target',   label:'هدف',       dot:{w:6,h:6,bg:'#e05c5c',br:'50%',b:'2px solid #fff'}, ring:{w:30,h:30,b:'2px solid #e05c5c',br:'50%'}},
+    {id:'ghost',    label:'شبح',       dot:{w:6,h:6,bg:'rgba(255,255,255,.1)',br:'50%',b:'1px solid rgba(255,255,255,.5)'}, ring:{w:28,h:28,b:'1px solid rgba(255,255,255,.15)',br:'50%'}},
+    {id:'neon_c',   label:'نيون أزرق', dot:{w:8,h:8,bg:'#0ff',br:'50%',sh:'0 0 10px #0ff'}, ring:{w:28,h:28,b:'1px solid #0ff',br:'50%',sh:'0 0 8px #0ff'}},
+    {id:'neon_p',   label:'نيون وردي', dot:{w:8,h:8,bg:'#f0f',br:'50%',sh:'0 0 10px #f0f'}, ring:{w:28,h:28,b:'1px solid #f0f',br:'50%',sh:'0 0 8px #f0f'}},
+    {id:'neon_g',   label:'نيون أخضر', dot:{w:8,h:8,bg:'#0f0',br:'50%',sh:'0 0 10px #0f0'}, ring:{w:28,h:28,b:'1px solid #0f0',br:'50%',sh:'0 0 8px #0f0'}},
+    {id:'samurai',  label:'ساموراي',   dot:{w:2,h:16,bg:'var(--accent)',br:'0',tr:'rotate(45deg)'}, ring:{w:2,h:16,bg:'rgba(255,255,255,.4)',br:'0',tr:'rotate(-45deg)'}},
+    {id:'star',     label:'نجمة',      dot:{w:10,h:10,bg:'var(--accent)',br:'50%',sh:'0 0 8px var(--accent)'}, ring:{w:28,h:28,b:'1px dashed rgba(var(--accent-rgb),.7)',br:'50%'}},
+    {id:'custom',   label:'مخصص',      dot:{w:0,h:0},                                   ring:{w:0,h:0}},
+];
+
+let activeCursorId = localStorage.getItem('cursor_id') || 'default';
+let customCursorUrl = null;
+
+function applyCursorStyle(id){
+    activeCursorId = id;
+    localStorage.setItem('cursor_id', id);
+    const s = CURSOR_STYLES.find(c=>c.id===id) || CURSOR_STYLES[0];
+
+    if(id==='custom' && customCursorUrl){
+        cur.style.opacity='0'; ring.style.opacity='0';
+        document.body.style.cursor=`url(${customCursorUrl}) 8 8, auto`;
+        return;
+    }
+    document.body.style.cursor='none';
+
+    const applyEl=(el,st)=>{
+        el.style.width       = (st.w||0)+'px';
+        el.style.height      = (st.h||0)+'px';
+        el.style.background  = st.bg||'transparent';
+        el.style.borderRadius= st.br||'50%';
+        el.style.border      = st.b||st.border||'none';
+        el.style.transform   = (st.tr||st.transform||'') + ' translateZ(0)';
+        el.style.boxShadow   = st.sh||st.boxShadow||'none';
+        el.style.mixBlendMode= st.blend||st.mixBlendMode||'normal';
+        el.style.opacity     = (st.w===0 || st.h===0) ? '0' : '1';
+    };
+    applyEl(cur, s.dot);
+    applyEl(ring, s.ring);
+}
+
+function buildCursorGrid(){
+    const grid=$('cursorGrid'); if(!grid) return;
+    grid.innerHTML = CURSOR_STYLES.map(s=>`
+        <div class="cur-choice" data-id="${s.id}"
+             style="background:rgba(0,0,0,.4);border:1px solid ${s.id===activeCursorId?'var(--accent)':'var(--border)'};
+             border-radius:6px;padding:8px 4px;text-align:center;cursor:none;transition:all .2s;">
+            <div style="font-size:10px;color:${s.id===activeCursorId?'var(--accent-light)':'rgba(255,255,255,.5)'}">
+                ${s.label}
+            </div>
+        </div>`).join('');
+    grid.querySelectorAll('.cur-choice').forEach(el=>{
+        el.addEventListener('click',()=>{
+            applyCursorStyle(el.dataset.id);
+            grid.querySelectorAll('.cur-choice').forEach(e=>{
+                const a=e.dataset.id===activeCursorId;
+                e.style.borderColor=a?'var(--accent)':'var(--border)';
+                e.querySelector('div').style.color=a?'var(--accent-light)':'rgba(255,255,255,.5)';
+            });
+        });
+    });
+}
+
+// Custom cursor file
+const cf=$('cursorFile');
+if(cf) cf.addEventListener('change',function(){
+    const f=this.files[0]; if(!f)return;
+    customCursorUrl=URL.createObjectURL(f);
+    $('cursorFileName').textContent='✓ '+f.name;
+    $('cursorFileName').style.display='block';
+    applyCursorStyle('custom');
+});
+
+// Inject buildCursorGrid into openSettings
+const _origOS2=openSettings;
+openSettings=function(){ _origOS2(); buildCursorGrid(); };
+
+applyCursorStyle(activeCursorId);
+
+attachHover('.pomo-btn,.notes-toggle,.notes-clear,.weather-widget,.recent-item');
+</script>
+</div>
+
+</body>
+</html>
